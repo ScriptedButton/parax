@@ -9,8 +9,13 @@ import {
   Text,
   Badge,
   Textarea,
+  FileButton,
+  TextInput,
+  ActionIcon,
+  Flex,
 } from "@mantine/core";
 import { useEffect, useState } from "react";
+import { TbUpload } from "react-icons/tb";
 
 export default function Multi() {
   // State
@@ -28,6 +33,7 @@ export default function Multi() {
   const [input, setInput] = useState("");
   const [image, setImage] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [file, setFile] = useState<File | null>(null);
   const [tps, setTps] = useState(null);
   const [numTokens, setNumTokens] = useState(null);
   const [imageProgress, setImageProgress] = useState(null);
@@ -206,9 +212,9 @@ export default function Multi() {
   }, [messages, isRunning]);
 
   return (
-    <Stack gap={"md"} p={"md"}>
+    <Stack gap={"md"} p={"md"} align={"stretch"} h={"100%"}>
       <Card withBorder>
-        <Stack>
+        <Stack flex={1}>
           <Group justify={"space-between"}>
             <Title order={4}>Multi-Modal LLM</Title>
           </Group>
@@ -239,45 +245,124 @@ export default function Multi() {
         )}
       </Card>
       {status === "ready" && (
-        <Card withBorder>
-          <Stack gap={"md"}>
-            <Button
-              onClick={() => {
-                onEnter(input, image);
-              }}
-              disabled={isRunning}
-            >
-              Generate
-            </Button>
-            <Textarea
-              autosize
-              className="w-full p-2"
-              minRows={4}
-              value={input}
-              onInput={(e) => setInput(e.target.value)}
-              placeholder="Input text..."
-            />
-          </Stack>
-        </Card>
-      )}
-      {messages.map((message, i) => (
-        <Card withBorder key={i} radius={"lg"}>
-          <Stack
-            gap={"md"}
-            align={message.role === "user" ? "flex-end" : "flex-start"}
-          >
-            <Badge>{message.role}</Badge>
-            <Text>{message.content}</Text>
-            {message.image && (
-              <img
-                src={message.image}
-                alt={"Generated image"}
-                className="w-full"
-              />
+        <>
+          {messages.map((message, i) => (
+            <Card withBorder key={i} radius={"lg"}>
+              <Stack
+                gap={"md"}
+                align={message.role === "user" ? "flex-end" : "flex-start"}
+              >
+                <Badge>{message.role}</Badge>
+                <Text>{message.content}</Text>
+                {message.image && (
+                  <img
+                    src={message.image}
+                    alt={"Generated image"}
+                    className="w-20 h-20 min-w-20 min-h-20 relative p-2"
+                  />
+                )}
+              </Stack>
+            </Card>
+          ))}
+          <p className="text-center text-sm min-h-6 text-gray-500 dark:text-gray-300">
+            {messages.length > 0 && (
+              <>
+                {tps ? (
+                  <>
+                    {!isRunning && (
+                      <span>
+                        Generated {numTokens} tokens in{" "}
+                        {(numTokens / tps).toFixed(2)} seconds&nbsp;&#40;
+                      </span>
+                    )}
+                    <span>{tps.toFixed(2)}</span>
+                    <span className="text-gray-500 dark:text-gray-300">
+                      tokens/second
+                    </span>
+                    {!isRunning && <span className="mr-1">&#41;.</span>}
+                  </>
+                ) : (
+                  imageProgress && (
+                    <>
+                      {isRunning ? (
+                        <>
+                          <span>Generating image...</span>&nbsp;&#40;
+                          <span className="font-medium font-mono text-center text-black dark:text-white">
+                            {(imageProgress * 100).toFixed(2)}%
+                          </span>
+                          <span className="mr-1">&#41;</span>
+                        </>
+                      ) : (
+                        <span>
+                          Generated image in{" "}
+                          {(imageGenerationTime / 1000).toFixed(2)}{" "}
+                          seconds.&nbsp;
+                        </span>
+                      )}
+                    </>
+                  )
+                )}
+
+                {!isRunning && (
+                  <Button
+                    className="underline cursor-pointer"
+                    onClick={() => setMessages([])}
+                  >
+                    Reset
+                  </Button>
+                )}
+              </>
             )}
-          </Stack>
-        </Card>
-      ))}
+          </p>
+          <Flex flex={1} />
+          <Group grow>
+            <TextInput
+              placeholder="Enter your message..."
+              value={input}
+              leftSection={
+                <FileButton
+                  onChange={(file) => {
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                      setImage(e.target?.result);
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                >
+                  {(props) => (
+                    <ActionIcon {...props}>
+                      <TbUpload />
+                    </ActionIcon>
+                  )}
+                </FileButton>
+              }
+              rightSection={
+                image && (
+                  <img
+                    src={image}
+                    alt={"Selected image"}
+                    className="w-20 h-20 min-w-20 min-h-20 relative p-2"
+                  />
+                )
+              }
+              onKeyDown={(e) => {
+                if (
+                  input.length > 0 &&
+                  !isRunning &&
+                  e.key === "Enter" &&
+                  !e.shiftKey
+                ) {
+                  e.preventDefault(); // Prevent default behavior of Enter key
+                  onEnter(input, image);
+                }
+              }}
+              onChange={(e) => setInput(e.currentTarget.value)}
+              disabled={status !== "ready"}
+            />
+          </Group>
+        </>
+      )}
     </Stack>
   );
 }
