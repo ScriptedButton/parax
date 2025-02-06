@@ -1,9 +1,14 @@
 // worker.ts
 import {
   pipeline,
-  TextGenerationPipeline,
   TextStreamer,
 } from "@huggingface/transformers";
+
+const STYLE_PROMPTS = {
+  standard: "Paraphrase this text while maintaining the same meaning:",
+  formal: "Paraphrase this text in a more formal and professional tone:",
+  simple: "Paraphrase this text in simpler, easier to understand language:",
+};
 
 class ParaphrasePipeline {
   static task = "text-generation";
@@ -21,12 +26,6 @@ class ParaphrasePipeline {
     return this.instance;
   }
 }
-
-const stylePrompts = {
-  standard: "Paraphrase this text while maintaining the same meaning:",
-  formal: "Paraphrase this text in a more formal and professional tone:",
-  simple: "Paraphrase this text in simpler, easier to understand language:",
-};
 
 self.addEventListener("message", async (event) => {
   const paraphraser = await ParaphrasePipeline.getInstance((progress) => {
@@ -51,7 +50,7 @@ self.addEventListener("message", async (event) => {
     },
     {
       role: "user",
-      content: `${stylePrompts[event.data.style] || stylePrompts.standard}\n\n${event.data.text}`,
+      content: `${STYLE_PROMPTS[event.data.style] || STYLE_PROMPTS.standard}\n\n${event.data.text}`,
     },
   ];
 
