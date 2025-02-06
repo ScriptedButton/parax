@@ -1,8 +1,8 @@
-# Welcome to React Router!
+# PARAX
 
-A modern, production-ready template for building full-stack React applications using React Router.
+A paraphrasing tool that leverages LLMs in the browser.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/ScriptedButton/parax)
 
 ## Features
 
