@@ -31,7 +31,11 @@ export const Selector = () => {
   return (
     <SimpleGrid cols={2}>
       {ITEMS.map((item) => (
-        <ItemCard title={item.title} location={item.location} />
+        <ItemCard
+          title={item.title}
+          location={item.location}
+          key={item.title}
+        />
       ))}
     </SimpleGrid>
   );
