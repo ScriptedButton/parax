@@ -1,58 +1,57 @@
-// Imports
 import {
   Button,
   Card,
   Group,
-  Progress,
   Stack,
   Title,
   Text,
   Badge,
-  Textarea,
-  FileButton,
   TextInput,
   ActionIcon,
-  Flex,
-  Box,
-  Image,
   Paper,
   Indicator,
   ScrollArea,
+  FileButton,
 } from "@mantine/core";
-import { useEffect, useState } from "react";
+import { type FC, useEffect, useState } from "react";
 import { TbUpload } from "react-icons/tb";
+import { LoaderStatus } from "~/components/chat/LoadingStatus";
+import type { ProgressItem } from "~/components/chat/types";
 
-interface StatusProps {
-  messages: any[];
-  tps: number;
-  numTokens: number;
-  imageProgress: number;
-  imageGenerationTime: number;
-  isRunning: boolean;
-  setMessages: (messages: any[]) => void;
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+  image?: string | null;
 }
 
-const Status = (props: StatusProps) => {
-  const {
-    messages,
-    tps,
-    numTokens,
-    imageProgress,
-    imageGenerationTime,
-    isRunning,
-    setMessages,
-  } = props;
+interface StatusProps {
+  messages: Message[];
+  tps: number | null;
+  numTokens: number | null;
+  imageProgress: number | null;
+  imageGenerationTime: number | null;
+  isRunning: boolean;
+  setMessages: (messages: Message[]) => void;
+}
 
+const Status: FC<StatusProps> = ({
+  messages,
+  tps,
+  numTokens,
+  imageProgress,
+  imageGenerationTime,
+  isRunning,
+}) => {
   return (
-    <Text ta={"center"}>
+    <Text ta="center">
       {messages.length > 0 && (
         <>
           {tps ? (
             <>
               {!isRunning && (
                 <Text span>
-                  Generated {numTokens} tokens in {(numTokens / tps).toFixed(2)}{" "}
-                  seconds&nbsp;&#40;
+                  Generated {numTokens} tokens in{" "}
+                  {((numTokens || 0) / tps).toFixed(2)} seconds&nbsp;&#40;
                 </Text>
               )}
               <Text span>{tps.toFixed(2)}</Text>
@@ -83,7 +82,8 @@ const Status = (props: StatusProps) => {
                   </>
                 ) : (
                   <Text span>
-                    Generated image in {(imageGenerationTime / 1000).toFixed(2)}{" "}
+                    Generated image in{" "}
+                    {((imageGenerationTime || 0) / 1000).toFixed(2)}{" "}
                     seconds.&nbsp;
                   </Text>
                 )}
@@ -96,30 +96,27 @@ const Status = (props: StatusProps) => {
   );
 };
 
+type WorkerStatus = "idle" | "loading" | "ready" | null;
+
 export default function Multi() {
-  // State
-  const [modelLoaded, setModelLoaded] = useState(false);
-  const [workerInstance, setWorkerInstance] = useState<Worker>();
+  const [workerInstance, setWorkerInstance] = useState<Worker | undefined>();
+  const [status, setStatus] = useState<WorkerStatus>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState<string>("");
+  const [progressItems, setProgressItems] = useState<ProgressItem[]>([]);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [input, setInput] = useState<string>("");
+  const [image, setImage] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [tps, setTps] = useState<number | null>(null);
+  const [numTokens, setNumTokens] = useState<number | null>(null);
+  const [imageProgress, setImageProgress] = useState<number | null>(null);
+  const [imageGenerationTime, setImageGenerationTime] = useState<number | null>(
+    null,
+  );
 
-  // Model loading and progress
-  const [status, setStatus] = useState(null);
-  const [error, setError] = useState(null);
-  const [loadingMessage, setLoadingMessage] = useState("");
-  const [progressItems, setProgressItems] = useState([]);
-  const [isRunning, setIsRunning] = useState(false);
-
-  // IO
-  const [input, setInput] = useState("");
-  const [image, setImage] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [file, setFile] = useState<File | null>(null);
-  const [tps, setTps] = useState(null);
-  const [numTokens, setNumTokens] = useState(null);
-  const [imageProgress, setImageProgress] = useState(null);
-  const [imageGenerationTime, setImageGenerationTime] = useState(null);
-
-  function onEnter(message, img) {
-    setMessages((prev) => [
+  function onEnter(message: string, img: string | null) {
+    setMessages((prev: Message[]) => [
       ...prev,
       { role: "user", content: message, image: img ?? image },
     ]);
@@ -132,9 +129,7 @@ export default function Multi() {
     setImageGenerationTime(null);
   }
 
-  // Initialization
   useEffect(() => {
-    // If the worker is not already initialized, update the state
     if (!workerInstance) {
       console.log("Initializing worker...");
       const worker = new Worker(
@@ -144,43 +139,45 @@ export default function Multi() {
         },
       );
 
-      worker.postMessage({ type: "check" }); // Do a feature check
-
+      worker.postMessage({ type: "check" });
       setWorkerInstance(worker);
     }
   }, []);
 
-  // Worker event listeners
   useEffect(() => {
     console.log("Worker initialized");
 
-    // Callback function for Worker messages
-    const onMessageReceived = (e) => {
-      console.log("Message received", e.data);
+    type WorkerMessage = {
+      status: string;
+      data?: any;
+      file?: string;
+      output?: string;
+      tps?: number;
+      numTokens?: number;
+      blob?: Blob;
+      progress?: number;
+      time?: number;
+      total?: number;
+      loaded?: number;
+    };
+
+    const onMessageReceived = (e: MessageEvent<WorkerMessage>) => {
       switch (e.data.status) {
-        // WebGPU feature checking
         case "success":
           setStatus("idle");
           break;
         case "error":
-          console.log("Error", e.data.data);
           setError(e.data.data);
           break;
-
         case "loading":
-          // Model file start load: add a new progress item to the list.
-          console.log("Loading", e.data.data);
           setStatus("loading");
           setLoadingMessage(e.data.data);
           break;
-
         case "initiate":
-          console.log("Initiate", e.data);
-          setProgressItems((prev) => [...prev, e.data]);
+          setProgressItems((prev) => [...prev, e.data as ProgressItem]);
           break;
 
         case "progress":
-          // Model file progress: update one of the progress items.
           setProgressItems((prev) =>
             prev.map((item) => {
               if (item.file === e.data.file) {
@@ -190,119 +187,96 @@ export default function Multi() {
             }),
           );
           break;
-
         case "done":
-          // Model file loaded: remove the progress item from the list.
           setProgressItems((prev) =>
             prev.filter((item) => item.file !== e.data.file),
           );
           break;
-
         case "ready":
-          // Pipeline ready: the worker is ready to accept messages.
           setStatus("ready");
           break;
-
         case "start":
-          {
-            console.log("Start", e.data);
-            // Start generation
-            setMessages((prev) => [
-              ...prev,
-              { role: "assistant", content: "" },
-            ]);
-          }
+          setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
           break;
-
         case "text-update":
-          // Generation update: update the output text.
-          // Parse messages
-          console.log("Text update", e.data);
           const { output, tps, numTokens } = e.data;
-          setTps(tps);
-          setNumTokens(numTokens);
+          setTps(tps || null);
+          setNumTokens(numTokens || null);
           setMessages((prev) => {
             const cloned = [...prev];
-            const last = cloned.at(-1);
-            cloned[cloned.length - 1] = {
-              ...last,
-              content: last.content + output,
-            };
+            const last = cloned[cloned.length - 1];
+            if (last) {
+              cloned[cloned.length - 1] = {
+                ...last,
+                content: last.content + (output || ""),
+              };
+            }
             return cloned;
           });
           break;
-
         case "image-update":
           const { blob, progress, time } = e.data;
-
           if (blob) {
-            // Add image to the last message
             const url = URL.createObjectURL(blob);
             setMessages((prev) => {
               const cloned = [...prev];
-              const last = cloned.at(-1);
-              cloned[cloned.length - 1] = {
-                ...last,
-                image: url,
-              };
+              const last = cloned[cloned.length - 1];
+              if (last) {
+                cloned[cloned.length - 1] = {
+                  ...last,
+                  image: url,
+                };
+              }
               return cloned;
             });
           } else {
-            setImageProgress(progress);
-            setImageGenerationTime(time);
+            setImageProgress(progress || null);
+            setImageGenerationTime(time || null);
           }
           break;
-
         case "complete":
-          // Generation complete: re-enable the "Generate" button
           setIsRunning(false);
           break;
       }
     };
 
-    const onErrorReceived = (e) => {
+    const onErrorReceived = (e: ErrorEvent) => {
       console.error("Worker error:", e);
     };
 
-    // Attach the callback function as an event listener.
     workerInstance?.addEventListener("message", onMessageReceived);
     workerInstance?.addEventListener("error", onErrorReceived);
 
-    // Define a cleanup function for when the component is unmounted.
     return () => {
       workerInstance?.removeEventListener("message", onMessageReceived);
       workerInstance?.removeEventListener("error", onErrorReceived);
     };
   }, [workerInstance]);
 
-  // Send the messages to the worker thread whenever the `messages` state changes.
   useEffect(() => {
     if (messages.filter((x) => x.role === "user").length === 0) {
-      // No user messages yet: do nothing.
       return;
     }
-    if (messages.at(-1).role === "assistant") {
-      // Do not update if the last message is from the assistant
+    if (messages[messages.length - 1]?.role === "assistant") {
       return;
     }
     setTps(null);
-    console.log("Sending messages to worker", messages);
     workerInstance?.postMessage({ type: "generate", data: messages });
   }, [messages, isRunning]);
 
   return (
     <Stack
-      align={"stretch"}
+      align="stretch"
       flex={1}
       p={0}
-      h={"100%"}
+      h="100%"
       style={{
         overflowY: "hidden",
       }}
     >
       <Card withBorder>
-        <Stack flex={1} h={"100%"}>
-          <Group justify={"space-between"} align={"center"}>
+        <Stack flex={1} h="100%">
+          <Group justify="space-between" align="center">
             <Title order={4}>Multi-Modal LLM</Title>
             <Status
               messages={messages}
@@ -315,7 +289,7 @@ export default function Multi() {
             />
           </Group>
           {!isRunning && messages.length > 0 && (
-            <Group justify={"flex-end"}>
+            <Group justify="flex-end">
               <Button
                 className="underline cursor-pointer"
                 onClick={() => setMessages([])}
@@ -331,7 +305,7 @@ export default function Multi() {
                   workerInstance?.postMessage({ type: "load" });
                   setStatus("loading");
                 }}
-                disabled={status === null || status === "loading"}
+                disabled={status === null}
               >
                 {status === null ? "Running feature checks..." : "Load model"}
               </Button>
@@ -340,13 +314,13 @@ export default function Multi() {
         </Stack>
       </Card>
       {status === "ready" && (
-        <Stack style={{ overflow: "hidden" }} gap={"sm"} flex={1}>
-          <ScrollArea flex={1} h={"100%"}>
+        <Stack style={{ overflow: "hidden" }} gap="sm" flex={1}>
+          <ScrollArea flex={1} h="100%">
             <Stack>
               {messages.map((message, i) => (
-                <Card withBorder key={i} radius={"lg"}>
+                <Card withBorder key={i} radius="lg">
                   <Stack
-                    gap={"md"}
+                    gap="md"
                     align={message.role === "user" ? "flex-end" : "flex-start"}
                   >
                     <Badge>{message.role}</Badge>
@@ -354,8 +328,10 @@ export default function Multi() {
                     {message.image && (
                       <img
                         src={message.image}
-                        alt={"Generated image"}
-                        className={`min-w-20 min-h-20 relative p-2 ${message.role === "user" ? "w-20 h-20" : undefined}`}
+                        alt="Generated image"
+                        className={`min-w-20 min-h-20 relative p-2 ${
+                          message.role === "user" ? "w-20 h-20" : undefined
+                        }`}
                       />
                     )}
                   </Stack>
@@ -365,11 +341,11 @@ export default function Multi() {
           </ScrollArea>
           <Stack>
             {image && (
-              <Paper p={"md"} radius={"lg"} withBorder>
+              <Paper p="md" radius="lg" withBorder>
                 <Indicator>
                   <img
                     src={image}
-                    alt={"Generated image"}
+                    alt="Generated image"
                     style={{
                       objectFit: "cover",
                     }}
@@ -380,7 +356,7 @@ export default function Multi() {
             )}
             <Group grow>
               <TextInput
-                size={"lg"}
+                size="lg"
                 placeholder="Enter your message..."
                 value={input}
                 flex={1}
@@ -389,34 +365,39 @@ export default function Multi() {
                 }}
                 leftSection={
                   <FileButton
-                    onChange={(file) => {
+                    onChange={(file: File | null) => {
                       if (!file) return;
                       const reader = new FileReader();
-                      reader.onload = (e) => {
-                        setImage(e.target?.result);
+                      reader.onload = (e: ProgressEvent<FileReader>) => {
+                        const result = e.target?.result;
+                        if (typeof result === "string") {
+                          setImage(result);
+                        }
                       };
                       reader.readAsDataURL(file);
                     }}
                   >
                     {(props) => (
-                      <ActionIcon {...props} mx={"md"}>
+                      <ActionIcon {...props} mx="md">
                         <TbUpload />
                       </ActionIcon>
                     )}
                   </FileButton>
                 }
-                onKeyDown={(e) => {
+                onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                   if (
                     input.length > 0 &&
                     !isRunning &&
                     e.key === "Enter" &&
                     !e.shiftKey
                   ) {
-                    e.preventDefault(); // Prevent default behavior of Enter key
+                    e.preventDefault();
                     onEnter(input, image);
                   }
                 }}
-                onChange={(e) => setInput(e.currentTarget.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setInput(e.currentTarget.value)
+                }
                 disabled={status !== "ready"}
               />
             </Group>
@@ -424,17 +405,15 @@ export default function Multi() {
         </Stack>
       )}
       {status === "loading" && (
-        <Box h={"100vh"} flex={1}>
-          <div className="w-full max-w-[500px] text-left mx-auto p-4 bottom-0 mt-auto">
-            <p className="text-center mb-1">{loadingMessage}</p>
-            {progressItems.map(({ file, progress, total }, i) => (
-              <Stack>
-                <Text c={"dimmed"}>{file}</Text>
-                <Progress key={i} value={progress} />
-              </Stack>
-            ))}
-          </div>
-        </Box>
+        <LoaderStatus
+          loadingMessage={loadingMessage}
+          progressItems={progressItems}
+        />
+      )}
+      {error && (
+        <Card withBorder>
+          <Text c="red">{error}</Text>
+        </Card>
       )}
     </Stack>
   );
