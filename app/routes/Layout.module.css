@@ -1,0 +1,12 @@
+.navItem {
+    color: var(--mantine-color-dimmed);
+}
+
+.navItem:hover {
+    color: var(--mantine-primary-color-0);
+}
+
+.navItem[aria-current="page"] {
+    color: var(--mantine-primary-color-0);
+    font-weight: bold;
+}

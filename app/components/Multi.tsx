@@ -13,9 +13,88 @@ import {
   TextInput,
   ActionIcon,
   Flex,
+  Box,
+  Image,
+  Paper,
+  Indicator,
+  ScrollArea,
 } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { TbUpload } from "react-icons/tb";
+
+interface StatusProps {
+  messages: any[];
+  tps: number;
+  numTokens: number;
+  imageProgress: number;
+  imageGenerationTime: number;
+  isRunning: boolean;
+  setMessages: (messages: any[]) => void;
+}
+
+const Status = (props: StatusProps) => {
+  const {
+    messages,
+    tps,
+    numTokens,
+    imageProgress,
+    imageGenerationTime,
+    isRunning,
+    setMessages,
+  } = props;
+
+  return (
+    <Text ta={"center"}>
+      {messages.length > 0 && (
+        <>
+          {tps ? (
+            <>
+              {!isRunning && (
+                <Text span>
+                  Generated {numTokens} tokens in {(numTokens / tps).toFixed(2)}{" "}
+                  seconds&nbsp;&#40;
+                </Text>
+              )}
+              <Text span>{tps.toFixed(2)}</Text>
+              <Text span className="text-gray-500 dark:text-gray-300">
+                tokens/second
+              </Text>
+              {!isRunning && (
+                <Text span className="mr-1">
+                  &#41;.
+                </Text>
+              )}
+            </>
+          ) : (
+            imageProgress && (
+              <Group>
+                {isRunning ? (
+                  <>
+                    <Text span>Generating image...</Text>&nbsp;&#40;
+                    <Text
+                      span
+                      className="font-medium font-mono text-center text-black dark:text-white"
+                    >
+                      {(imageProgress * 100).toFixed(2)}%
+                    </Text>
+                    <Text span className="mr-1">
+                      &#41;
+                    </Text>
+                  </>
+                ) : (
+                  <Text span>
+                    Generated image in {(imageGenerationTime / 1000).toFixed(2)}{" "}
+                    seconds.&nbsp;
+                  </Text>
+                )}
+              </Group>
+            )
+          )}
+        </>
+      )}
+    </Text>
+  );
+};
 
 export default function Multi() {
   // State
@@ -212,156 +291,150 @@ export default function Multi() {
   }, [messages, isRunning]);
 
   return (
-    <Stack gap={"md"} p={"md"} align={"stretch"} h={"100%"}>
+    <Stack
+      align={"stretch"}
+      flex={1}
+      p={0}
+      h={"100%"}
+      style={{
+        overflowY: "hidden",
+      }}
+    >
       <Card withBorder>
-        <Stack flex={1}>
-          <Group justify={"space-between"}>
+        <Stack flex={1} h={"100%"}>
+          <Group justify={"space-between"} align={"center"}>
             <Title order={4}>Multi-Modal LLM</Title>
-          </Group>
-          {(status === null || status === "idle") && messages.length === 0 && (
-            <Button
-              onClick={() => {
-                workerInstance?.postMessage({ type: "load" });
-                setStatus("loading");
-              }}
-              disabled={status === null || status === "loading"}
-            >
-              {status === null ? "Running feature checks..." : "Load model"}
-            </Button>
-          )}
-        </Stack>
-        {status === "loading" && (
-          <>
-            <div className="w-full max-w-[500px] text-left mx-auto p-4 bottom-0 mt-auto">
-              <p className="text-center mb-1">{loadingMessage}</p>
-              {progressItems.map(({ file, progress, total }, i) => (
-                <Stack>
-                  <Text c={"dimmed"}>{file}</Text>
-                  <Progress key={i} value={progress} />
-                </Stack>
-              ))}
-            </div>
-          </>
-        )}
-      </Card>
-      {status === "ready" && (
-        <>
-          {messages.map((message, i) => (
-            <Card withBorder key={i} radius={"lg"}>
-              <Stack
-                gap={"md"}
-                align={message.role === "user" ? "flex-end" : "flex-start"}
-              >
-                <Badge>{message.role}</Badge>
-                <Text>{message.content}</Text>
-                {message.image && (
-                  <img
-                    src={message.image}
-                    alt={"Generated image"}
-                    className="w-20 h-20 min-w-20 min-h-20 relative p-2"
-                  />
-                )}
-              </Stack>
-            </Card>
-          ))}
-          <p className="text-center text-sm min-h-6 text-gray-500 dark:text-gray-300">
-            {messages.length > 0 && (
-              <>
-                {tps ? (
-                  <>
-                    {!isRunning && (
-                      <span>
-                        Generated {numTokens} tokens in{" "}
-                        {(numTokens / tps).toFixed(2)} seconds&nbsp;&#40;
-                      </span>
-                    )}
-                    <span>{tps.toFixed(2)}</span>
-                    <span className="text-gray-500 dark:text-gray-300">
-                      tokens/second
-                    </span>
-                    {!isRunning && <span className="mr-1">&#41;.</span>}
-                  </>
-                ) : (
-                  imageProgress && (
-                    <>
-                      {isRunning ? (
-                        <>
-                          <span>Generating image...</span>&nbsp;&#40;
-                          <span className="font-medium font-mono text-center text-black dark:text-white">
-                            {(imageProgress * 100).toFixed(2)}%
-                          </span>
-                          <span className="mr-1">&#41;</span>
-                        </>
-                      ) : (
-                        <span>
-                          Generated image in{" "}
-                          {(imageGenerationTime / 1000).toFixed(2)}{" "}
-                          seconds.&nbsp;
-                        </span>
-                      )}
-                    </>
-                  )
-                )}
-
-                {!isRunning && (
-                  <Button
-                    className="underline cursor-pointer"
-                    onClick={() => setMessages([])}
-                  >
-                    Reset
-                  </Button>
-                )}
-              </>
-            )}
-          </p>
-          <Flex flex={1} />
-          <Group grow>
-            <TextInput
-              placeholder="Enter your message..."
-              value={input}
-              leftSection={
-                <FileButton
-                  onChange={(file) => {
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                      setImage(e.target?.result);
-                    };
-                    reader.readAsDataURL(file);
-                  }}
-                >
-                  {(props) => (
-                    <ActionIcon {...props}>
-                      <TbUpload />
-                    </ActionIcon>
-                  )}
-                </FileButton>
-              }
-              rightSection={
-                image && (
-                  <img
-                    src={image}
-                    alt={"Selected image"}
-                    className="w-20 h-20 min-w-20 min-h-20 relative p-2"
-                  />
-                )
-              }
-              onKeyDown={(e) => {
-                if (
-                  input.length > 0 &&
-                  !isRunning &&
-                  e.key === "Enter" &&
-                  !e.shiftKey
-                ) {
-                  e.preventDefault(); // Prevent default behavior of Enter key
-                  onEnter(input, image);
-                }
-              }}
-              onChange={(e) => setInput(e.currentTarget.value)}
-              disabled={status !== "ready"}
+            <Status
+              messages={messages}
+              tps={tps}
+              numTokens={numTokens}
+              imageProgress={imageProgress}
+              imageGenerationTime={imageGenerationTime}
+              isRunning={isRunning}
+              setMessages={setMessages}
             />
           </Group>
-        </>
+          {!isRunning && messages.length > 0 && (
+            <Group justify={"flex-end"}>
+              <Button
+                className="underline cursor-pointer"
+                onClick={() => setMessages([])}
+              >
+                Clear
+              </Button>
+            </Group>
+          )}
+          {(status === null || status === "idle") && messages.length === 0 && (
+            <Group>
+              <Button
+                onClick={() => {
+                  workerInstance?.postMessage({ type: "load" });
+                  setStatus("loading");
+                }}
+                disabled={status === null || status === "loading"}
+              >
+                {status === null ? "Running feature checks..." : "Load model"}
+              </Button>
+            </Group>
+          )}
+        </Stack>
+      </Card>
+      {status === "ready" && (
+        <Stack style={{ overflow: "hidden" }} gap={"sm"} flex={1}>
+          <ScrollArea flex={1} h={"100%"}>
+            <Stack>
+              {messages.map((message, i) => (
+                <Card withBorder key={i} radius={"lg"}>
+                  <Stack
+                    gap={"md"}
+                    align={message.role === "user" ? "flex-end" : "flex-start"}
+                  >
+                    <Badge>{message.role}</Badge>
+                    <Text>{message.content}</Text>
+                    {message.image && (
+                      <img
+                        src={message.image}
+                        alt={"Generated image"}
+                        className={`min-w-20 min-h-20 relative p-2 ${message.role === "user" ? "w-20 h-20" : undefined}`}
+                      />
+                    )}
+                  </Stack>
+                </Card>
+              ))}
+            </Stack>
+          </ScrollArea>
+          <Stack>
+            {image && (
+              <Paper p={"md"} radius={"lg"} withBorder>
+                <Indicator>
+                  <img
+                    src={image}
+                    alt={"Generated image"}
+                    style={{
+                      objectFit: "cover",
+                    }}
+                    className="h-20 w-28 border-gray-300/20 hover:border-border-300/30 transition relative -mb-1 rounded-[0.625rem] border-2"
+                  />
+                </Indicator>
+              </Paper>
+            )}
+            <Group grow>
+              <TextInput
+                size={"lg"}
+                placeholder="Enter your message..."
+                value={input}
+                flex={1}
+                style={{
+                  zIndex: 1,
+                }}
+                leftSection={
+                  <FileButton
+                    onChange={(file) => {
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (e) => {
+                        setImage(e.target?.result);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  >
+                    {(props) => (
+                      <ActionIcon {...props} mx={"md"}>
+                        <TbUpload />
+                      </ActionIcon>
+                    )}
+                  </FileButton>
+                }
+                onKeyDown={(e) => {
+                  if (
+                    input.length > 0 &&
+                    !isRunning &&
+                    e.key === "Enter" &&
+                    !e.shiftKey
+                  ) {
+                    e.preventDefault(); // Prevent default behavior of Enter key
+                    onEnter(input, image);
+                  }
+                }}
+                onChange={(e) => setInput(e.currentTarget.value)}
+                disabled={status !== "ready"}
+              />
+            </Group>
+          </Stack>
+        </Stack>
+      )}
+      {status === "loading" && (
+        <Box h={"100vh"} flex={1}>
+          <div className="w-full max-w-[500px] text-left mx-auto p-4 bottom-0 mt-auto">
+            <p className="text-center mb-1">{loadingMessage}</p>
+            {progressItems.map(({ file, progress, total }, i) => (
+              <Stack>
+                <Text c={"dimmed"}>{file}</Text>
+                <Progress key={i} value={progress} />
+              </Stack>
+            ))}
+          </div>
+        </Box>
       )}
     </Stack>
   );

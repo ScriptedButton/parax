@@ -29,7 +29,7 @@ const ItemCard = ({ title, location }: ItemCardProps) => {
 
 export const Selector = () => {
   return (
-    <SimpleGrid cols={2} flex={1} p={"md"}>
+    <SimpleGrid cols={2}>
       {ITEMS.map((item) => (
         <ItemCard title={item.title} location={item.location} />
       ))}
