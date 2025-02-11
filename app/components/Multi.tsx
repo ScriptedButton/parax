@@ -17,6 +17,8 @@ import { type FC, useEffect, useState } from "react";
 import { TbUpload } from "react-icons/tb";
 import { LoaderStatus } from "~/components/chat/LoadingStatus";
 import type { ProgressItem } from "~/components/chat/types";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface Message {
   role: "user" | "assistant";
@@ -162,6 +164,7 @@ export default function Multi() {
     };
 
     const onMessageReceived = (e: MessageEvent<WorkerMessage>) => {
+      console.log("Worker message:", e.data);
       switch (e.data.status) {
         case "success":
           setStatus("idle");
@@ -324,7 +327,9 @@ export default function Multi() {
                     align={message.role === "user" ? "flex-end" : "flex-start"}
                   >
                     <Badge>{message.role}</Badge>
-                    <Text>{message.content}</Text>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {message.content}
+                    </ReactMarkdown>
                     {message.image && (
                       <img
                         src={message.image}
