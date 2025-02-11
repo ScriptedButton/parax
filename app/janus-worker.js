@@ -173,11 +173,6 @@ async function generate(messages) {
           ]
         : [
             {
-              role: "<|System|>",
-              content:
-                "You are a helpful assistant. Answer the user's questions in a concise manner.",
-            },
-            {
               role: "<|User|>",
               content: message.content,
             },
